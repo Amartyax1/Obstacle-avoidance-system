@@ -1,0 +1,15 @@
+/home/amartya/drone_ws/install/drone_robot/share/ament_index/resource_index/package_run_dependencies/drone_robot
+/home/amartya/drone_ws/install/drone_robot/share/ament_index/resource_index/parent_prefix_path/drone_robot
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/environment/ament_prefix_path.sh
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/environment/ament_prefix_path.dsv
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/environment/path.sh
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/environment/path.dsv
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/local_setup.bash
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/local_setup.sh
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/local_setup.zsh
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/local_setup.dsv
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/package.dsv
+/home/amartya/drone_ws/install/drone_robot/share/ament_index/resource_index/packages/drone_robot
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/cmake/drone_robotConfig.cmake
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/cmake/drone_robotConfig-version.cmake
+/home/amartya/drone_ws/install/drone_robot/share/drone_robot/package.xml

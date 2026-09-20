@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Multicopter Motor Model Plugin -->
+  <gazebo>
+    <plugin
+      filename="gz-sim-multicopter-motor-model-system"
+      name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>drone</robotNamespace>
+      <commandSubTopic>cmd_vel</commandSubTopic>
+
+      <!-- Rotor 1: Front Left -->
+      <motorNumber>0</motorNumber>
+      <jointName>rotor_front_left_joint</jointName>
+      <turningDirection>ccw</turningDirection>
+
+      <!-- Rotor 2: Front Right -->
+      <motorNumber>1</motorNumber>
+      <jointName>rotor_front_right_joint</jointName>
+      <turningDirection>cw</turningDirection>
+
+      <!-- Rotor 3: Rear Left -->
+      <motorNumber>2</motorNumber>
+      <jointName>rotor_rear_left_joint</jointName>
+      <turningDirection>cw</turningDirection>
+
+      <!-- Rotor 4: Rear Right -->
+      <motorNumber>3</motorNumber>
+      <jointName>rotor_rear_right_joint</jointName>
+      <turningDirection>ccw</turningDirection>
+    </plugin>
+  </gazebo>
+
+</robot>
+

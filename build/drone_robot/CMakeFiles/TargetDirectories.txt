@@ -1,0 +1,9 @@
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/uninstall.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/drone_robot_uninstall.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/test.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/edit_cache.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/rebuild_cache.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/list_install_components.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/install.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/install/local.dir
+/home/amartya/drone_ws/build/drone_robot/CMakeFiles/install/strip.dir
