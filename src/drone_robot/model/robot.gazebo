@@ -1,35 +1,84 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- Multicopter Motor Model Plugin -->
+  <!-- LiDAR Sensor Plugin -->
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <update_rate>30.0</update_rate>
+      <topic>scan</topic>
+      <gz_frame_id>lidar_link</gz_frame_id>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>180</samples>
+            <resolution>1</resolution>
+            <min_angle>-1.570796</min_angle>
+            <max_angle>1.570796</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.05</min>
+          <max>5.0</max>
+          <resolution>0.01</resolution>
+        </range>
+      </ray>
+    </sensor>
+  </gazebo>
+
+  <!-- Odometry and Pose Publisher Plugin -->
   <gazebo>
     <plugin
-      filename="gz-sim-multicopter-motor-model-system"
-      name="gz::sim::systems::MulticopterMotorModel">
+      filename="gz-sim-odometry-publisher-system"
+      name="gz::sim::systems::OdometryPublisher">
+      <odom_topic>odom</odom_topic>
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <dimensions>3</dimensions>
+    </plugin>
+  </gazebo>
+
+  <!-- Multicopter Velocity Control Plugin -->
+  <gazebo>
+    <plugin
+      filename="gz-sim-multicopter-control-system"
+      name="gz::sim::systems::MulticopterVelocityControl">
       <robotNamespace>drone</robotNamespace>
       <commandSubTopic>cmd_vel</commandSubTopic>
+      <enableSubTopic>enable</enableSubTopic>
+      <comLinkName>base_link</comLinkName>
+      <velocityGain>2.7 2.7 2.7</velocityGain>
+      <attitudeGain>2.0 2.0 2.0</attitudeGain>
+      <angularRateGain>0.4 0.4 0.4</angularRateGain>
+      <maximumLinearAcceleration>2.0 2.0 2.0</maximumLinearAcceleration>
 
-      <!-- Rotor 1: Front Left -->
-      <motorNumber>0</motorNumber>
-      <jointName>rotor_front_left_joint</jointName>
-      <turningDirection>ccw</turningDirection>
-
-      <!-- Rotor 2: Front Right -->
-      <motorNumber>1</motorNumber>
-      <jointName>rotor_front_right_joint</jointName>
-      <turningDirection>cw</turningDirection>
-
-      <!-- Rotor 3: Rear Left -->
-      <motorNumber>2</motorNumber>
-      <jointName>rotor_rear_left_joint</jointName>
-      <turningDirection>cw</turningDirection>
-
-      <!-- Rotor 4: Rear Right -->
-      <motorNumber>3</motorNumber>
-      <jointName>rotor_rear_right_joint</jointName>
-      <turningDirection>ccw</turningDirection>
+      <!-- Rotor Configuration -->
+      <rotor>
+        <jointName>rotor_front_left_joint</jointName>
+        <forceConstant>8.54858e-06</forceConstant>
+        <momentConstant>0.016</momentConstant>
+        <direction>1</direction>
+      </rotor>
+      <rotor>
+        <jointName>rotor_front_right_joint</jointName>
+        <forceConstant>8.54858e-06</forceConstant>
+        <momentConstant>0.016</momentConstant>
+        <direction>-1</direction>
+      </rotor>
+      <rotor>
+        <jointName>rotor_rear_left_joint</jointName>
+        <forceConstant>8.54858e-06</forceConstant>
+        <momentConstant>0.016</momentConstant>
+        <direction>-1</direction>
+      </rotor>
+      <rotor>
+        <jointName>rotor_rear_right_joint</jointName>
+        <forceConstant>8.54858e-06</forceConstant>
+        <momentConstant>0.016</momentConstant>
+        <direction>1</direction>
+      </rotor>
     </plugin>
   </gazebo>
 
 </robot>
-

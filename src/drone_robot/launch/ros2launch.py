@@ -9,9 +9,8 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    xacro_file = os.path.join(
-        get_package_share_directory('drone_robot'), 'model', 'robot.xacro'
-    )
+    pkg_share = get_package_share_directory('drone_robot')
+    xacro_file = os.path.join(pkg_share, 'model', 'robot.xacro')
     robot_description = ParameterValue(
         Command(['xacro ', xacro_file]), value_type=str
     )
@@ -19,7 +18,7 @@ def generate_launch_description():
     return LaunchDescription([
         ExecuteProcess(
             cmd=['ros2', 'launch', 'ros_gz_sim', 'gz_sim.launch.py',
-                 'gz_args:=empty.sdf'],
+                 'gz_args:=empty.sdf -r'],
             output='screen'
         ),
         Node(
@@ -35,7 +34,7 @@ def generate_launch_description():
                 '-world', 'empty',
                 '-topic', 'robot_description',
                 '-name', 'drone_robot',
-                '-x', '0', '-y', '0', '-z', '0.15'
+                '-x', '0', '-y', '0', '-z', '0.2'
             ],
             output='screen'
         ),
@@ -48,6 +47,12 @@ def generate_launch_description():
                 '/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
                 '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan'
             ],
+            output='screen'
+        ),
+        Node(
+            package='drone_robot',
+            executable='inference_node.py',
+            name='drone_inference_node',
             output='screen'
         ),
     ])
