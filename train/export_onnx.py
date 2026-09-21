@@ -5,6 +5,7 @@ import torch.nn as nn
 import numpy as np
 from stable_baselines3 import PPO
 
+
 class OnnxActor(nn.Module):
     def __init__(self, policy):
         super().__init__()
@@ -15,6 +16,7 @@ class OnnxActor(nn.Module):
         features = self.mlp_extractor(obs)
         action = self.action_net(features)
         return action
+
 
 def export_policy_to_onnx(checkpoint_path: str, output_path: str, verify: bool = True):
     if not os.path.exists(checkpoint_path):
@@ -53,4 +55,43 @@ def export_policy_to_onnx(checkpoint_path: str, output_path: str, verify: bool =
         ort_session = ort.InferenceSession(output_path)
         test_inputs = np.random.randn(5, 18).astype(np.float32)
 
-        with torch.no_grad
+        with torch.no_grad():
+            torch_out = actor(torch.from_numpy(test_inputs)).numpy()
+
+        ort_inputs = {ort_session.get_inputs()[0].name: test_inputs}
+        ort_out = ort_session.run(None, ort_inputs)[0]
+
+        max_diff = np.max(np.abs(torch_out - ort_out))
+        print(f"Max absolute difference between PyTorch and ONNX Runtime: {max_diff:.2e}")
+        assert np.allclose(torch_out, ort_out, rtol=1e-3, atol=1e-5), (
+            "ONNX and PyTorch outputs do not match within tolerance!"
+        )
+        print("Verification successful: ONNX model produces matching output.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Export a trained SB3 PPO model to ONNX format.")
+    parser.add_argument(
+        "--ckpt",
+        type=str,
+        default="runs/phase1/latest.zip",
+        help="Path to the trained SB3 PPO checkpoint (.zip)"
+    )
+    parser.add_argument(
+        "--out",
+        type=str,
+        default="../src/drone_robot/models/drone_brain.onnx",
+        help="Path to output .onnx file"
+    )
+    parser.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="Skip output verification against PyTorch"
+    )
+    args = parser.parse_args()
+
+    export_policy_to_onnx(args.ckpt, args.out, verify=not args.no_verify)
+
+
+if __name__ == "__main__":
+    main()
