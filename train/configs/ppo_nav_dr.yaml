@@ -1,0 +1,13 @@
+n_timesteps: 750000
+n_envs: 8
+seed: 1
+domain_rand: true
+net_arch: [64, 64]
+# Lower LR: this run fine-tunes the Phase 1 policy rather than starting over.
+learning_rate: 0.0001
+n_steps: 512
+batch_size: 256
+gamma: 0.99
+log_dir: runs/phase2_dr
+checkpoint_every: 100000
+init_from: runs/phase1/latest.zip

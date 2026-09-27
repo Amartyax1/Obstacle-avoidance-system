@@ -1,0 +1,25 @@
+drone_inference_node:
+  ros__parameters:
+    # Empty means "use models/drone_brain.onnx from the package share directory".
+    model_path: ""
+    # Fallback single goal if waypoint lists are empty.
+    target_x: 26.0
+    target_y: 0.0
+    # Factory transit: spawn west, first goal east, then return west.
+    waypoint_xs: [26.0, -5.0]
+    waypoint_ys: [0.0, 0.0]
+    loop_waypoints: true
+    goal_tolerance: 0.8
+    # Must match MAX_RANGE in train/envs/lidar_nav_env.py.
+    range_max: 5.0
+    min_vx: -0.5
+    max_vx: 1.5
+    max_wz: 1.0
+    control_rate_hz: 50.0
+    # Stop commanding if sensor data goes stale, rather than flying blind.
+    sensor_timeout_sec: 0.5
+    # Same altitude hold as train/envs/lidar_nav_env.py (HOVER_Z / gain / clip).
+    hover_z: 1.0
+    altitude_gain: 1.8
+    altitude_kd: 1.2
+    max_vz: 1.0

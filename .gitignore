@@ -1,0 +1,11 @@
+.aider*
+*.pyc
+__pycache__/
+*.swp
+.venv/
+train/.venv/
+train/runs/
+train/results/
+log/
+build/
+install/

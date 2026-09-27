@@ -1,0 +1,12 @@
+n_timesteps: 1500000
+# PyBullet is CPU bound; parallel envs are the main speed and diversity lever.
+n_envs: 8
+seed: 0
+domain_rand: false
+net_arch: [64, 64]
+learning_rate: 0.0003
+n_steps: 512
+batch_size: 256
+gamma: 0.99
+log_dir: runs/phase1
+checkpoint_every: 100000

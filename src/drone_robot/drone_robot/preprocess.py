@@ -1,5 +1,34 @@
+"""
+LaserScan/Odometry to (1, 18) observation, matching train/envs/lidar_nav_env.py.
+
+The training env casts 16 rays over a 180 deg forward fan, clips to 5 m, maps to
+[-1, 1], and appends the body-frame goal vector scaled by the same 5 m. Any change
+here has to be mirrored there or the policy sees out-of-distribution input.
+"""
+
 import math
+
 import numpy as np
+
+N_RAYS = 16
+OBS_DIM = 18
+MAX_RANGE = 5.0
+HOVER_Z = 1.0
+ALTITUDE_GAIN = 1.8
+ALTITUDE_KD = 1.2
+MAX_VZ = 1.0
+
+
+def hover_vz(
+    z: float,
+    z_dot: float = 0.0,
+    hover_z: float = HOVER_Z,
+    gain: float = ALTITUDE_GAIN,
+    kd: float = ALTITUDE_KD,
+    limit: float = MAX_VZ,
+) -> float:
+    """PD altitude hold; P-term matches LidarNavEnv, D-term damps Gazebo overshoot."""
+    return float(np.clip(gain * (hover_z - z) - kd * z_dot, -limit, limit))
 
 
 def quaternion_to_yaw(x: float, y: float, z: float, w: float) -> float:
@@ -14,12 +43,9 @@ def compute_relative_target_in_body_frame(
     drone_y: float,
     yaw: float,
     target_x: float,
-    target_y: float
+    target_y: float,
 ) -> tuple[float, float]:
-    """
-    Compute relative target position (dx, dy) expressed in the drone's body frame.
-    x points forward, y points left.
-    """
+    """Relative target (dx, dy) in the drone body frame: x forward, y left."""
     delta_x = target_x - drone_x
     delta_y = target_y - drone_y
 
@@ -32,62 +58,53 @@ def compute_relative_target_in_body_frame(
 
 
 def process_laser_scan(
-    ranges: list[float],
+    ranges,
     angle_min: float,
-    angle_max: float,
     angle_increment: float,
     range_min: float = 0.05,
-    range_max: float = 5.0,
-    num_bins: int = 16
+    range_max: float = MAX_RANGE,
+    num_bins: int = N_RAYS,
 ) -> np.ndarray:
     """
-    Extracts forward 180-degree field of view [-pi/2, pi/2],
-    downsamples into `num_bins` equal angular sectors taking the minimum valid distance,
-    and normalizes ranges to [-1.0, 1.0].
+    Downsample the forward 180 deg fan into `num_bins` sectors, normalized to [-1, 1].
+
+    NaN/Inf mean "nothing detected" and become max range. Each bin keeps the
+    closest return so obstacles are never averaged away.
     """
-    num_ranges = len(ranges)
-    if num_ranges == 0:
+    ranges_arr = np.asarray(ranges, dtype=np.float32)
+    if ranges_arr.size == 0:
         return np.ones(num_bins, dtype=np.float32)
 
-    angles = angle_min + np.arange(num_ranges) * angle_increment
-    ranges_arr = np.array(ranges, dtype=np.float32)
+    angles = angle_min + np.arange(ranges_arr.size, dtype=np.float32) * angle_increment
 
-    # Filter invalid readings (inf, nan)
-    ranges_arr = np.where(np.isnan(ranges_arr), range_max, ranges_arr)
-    ranges_arr = np.where(np.isinf(ranges_arr), range_max, ranges_arr)
+    valid = np.isfinite(ranges_arr)
+    ranges_arr = np.where(valid, ranges_arr, range_max)
     ranges_arr = np.clip(ranges_arr, range_min, range_max)
 
-    # Select forward 180 degrees: [-pi/2, pi/2]
-    fov_mask = (angles >= -math.pi / 2.0) & (angles <= math.pi / 2.0)
+    half_fov = math.pi / 2.0
+    fov_mask = (angles >= -half_fov) & (angles <= half_fov)
+    if not np.any(fov_mask):
+        return np.ones(num_bins, dtype=np.float32)
     fov_angles = angles[fov_mask]
     fov_ranges = ranges_arr[fov_mask]
 
-    if len(fov_ranges) == 0:
-        return np.ones(num_bins, dtype=np.float32)
+    # Bin index per ray; the final edge is inclusive so +90 deg is not dropped.
+    bin_width = (2.0 * half_fov) / num_bins
+    idx = np.clip(((fov_angles + half_fov) / bin_width).astype(np.int32), 0, num_bins - 1)
 
-    bin_edges = np.linspace(-math.pi / 2.0, math.pi / 2.0, num_bins + 1)
-    binned_ranges = np.full(num_bins, range_max, dtype=np.float32)
+    binned = np.full(num_bins, range_max, dtype=np.float32)
+    np.minimum.at(binned, idx, fov_ranges)
 
-    for i in range(num_bins):
-        in_bin = (fov_angles >= bin_edges[i]) & (fov_angles < bin_edges[i + 1])
-        if np.any(in_bin):
-            binned_ranges[i] = np.min(fov_ranges[in_bin])
-
-    # Normalize from [0.0, range_max] to [-1.0, 1.0]
-    normalized_ranges = 2.0 * (binned_ranges / range_max) - 1.0
-    return normalized_ranges.astype(np.float32)
+    return (2.0 * (binned / range_max) - 1.0).astype(np.float32)
 
 
 def assemble_observation(
     normalized_lidar: np.ndarray,
     body_dx: float,
     body_dy: float,
-    max_target_dist: float = 10.0
+    max_target_dist: float = MAX_RANGE,
 ) -> np.ndarray:
-    """
-    Combines 16 normalized lidar rays with body-frame (dx, dy)
-    into a (1, 18) float32 array ready for ONNX inference.
-    """
+    """Combine 16 normalized rays with body-frame (dx, dy) into (1, 18) float32."""
     norm_dx = np.clip(body_dx / max_target_dist, -1.0, 1.0)
     norm_dy = np.clip(body_dy / max_target_dist, -1.0, 1.0)
 

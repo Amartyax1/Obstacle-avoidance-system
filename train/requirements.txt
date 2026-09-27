@@ -1,0 +1,12 @@
+# numpy must stay below 2.0: gym-pybullet-drones breaks on 2.x, and installing
+# onnx will silently upgrade it.
+numpy>=1.24,<2.0
+pyyaml>=6.0
+tensorboard>=2.14
+gymnasium>=0.28,<0.29
+stable-baselines3>=2.2,<2.3
+pybullet>=3.2.5
+onnx>=1.15
+onnxruntime>=1.17
+# Latest main requires Python 3.12; this commit supports 3.10 (Humble).
+gym-pybullet-drones @ git+https://github.com/utiasDSL/gym-pybullet-drones.git@bc83796eb6a8000882eedd9483d054d6e0554686

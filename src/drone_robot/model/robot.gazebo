@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- LiDAR Sensor Plugin -->
+  <!-- Forward 180 deg planar LiDAR: same FOV, ray count and range as the
+       training env (train/envs/lidar_nav_env.py). -->
   <gazebo reference="lidar_link">
     <sensor name="lidar" type="gpu_lidar">
       <always_on>true</always_on>
@@ -12,11 +13,16 @@
       <ray>
         <scan>
           <horizontal>
-            <samples>180</samples>
+            <samples>16</samples>
             <resolution>1</resolution>
             <min_angle>-1.570796</min_angle>
             <max_angle>1.570796</max_angle>
           </horizontal>
+          <vertical>
+            <samples>1</samples>
+            <min_angle>0</min_angle>
+            <max_angle>0</max_angle>
+          </vertical>
         </scan>
         <range>
           <min>0.05</min>
@@ -27,7 +33,6 @@
     </sensor>
   </gazebo>
 
-  <!-- Odometry and Pose Publisher Plugin -->
   <gazebo>
     <plugin
       filename="gz-sim-odometry-publisher-system"
@@ -39,46 +44,78 @@
     </plugin>
   </gazebo>
 
-  <!-- Multicopter Velocity Control Plugin -->
+  <!-- Velocity controller: turns a Twist into per-rotor speed commands, which
+       the motor models below convert into thrust. Both halves are required. -->
   <gazebo>
     <plugin
       filename="gz-sim-multicopter-control-system"
       name="gz::sim::systems::MulticopterVelocityControl">
-      <robotNamespace>drone</robotNamespace>
-      <commandSubTopic>cmd_vel</commandSubTopic>
+      <robotNamespace>drone_robot</robotNamespace>
+      <commandSubTopic>gazebo/command/twist</commandSubTopic>
       <enableSubTopic>enable</enableSubTopic>
       <comLinkName>base_link</comLinkName>
       <velocityGain>2.7 2.7 2.7</velocityGain>
-      <attitudeGain>2.0 2.0 2.0</attitudeGain>
-      <angularRateGain>0.4 0.4 0.4</angularRateGain>
+      <attitudeGain>2.0 3.0 0.15</attitudeGain>
+      <angularRateGain>0.4 0.52 0.18</angularRateGain>
       <maximumLinearAcceleration>2.0 2.0 2.0</maximumLinearAcceleration>
 
-      <!-- Rotor Configuration -->
-      <rotor>
-        <jointName>rotor_front_left_joint</jointName>
-        <forceConstant>8.54858e-06</forceConstant>
-        <momentConstant>0.016</momentConstant>
-        <direction>1</direction>
-      </rotor>
-      <rotor>
-        <jointName>rotor_front_right_joint</jointName>
-        <forceConstant>8.54858e-06</forceConstant>
-        <momentConstant>0.016</momentConstant>
-        <direction>-1</direction>
-      </rotor>
-      <rotor>
-        <jointName>rotor_rear_left_joint</jointName>
-        <forceConstant>8.54858e-06</forceConstant>
-        <momentConstant>0.016</momentConstant>
-        <direction>-1</direction>
-      </rotor>
-      <rotor>
-        <jointName>rotor_rear_right_joint</jointName>
-        <forceConstant>8.54858e-06</forceConstant>
-        <momentConstant>0.016</momentConstant>
-        <direction>1</direction>
-      </rotor>
+      <rotorConfiguration>
+        <rotor>
+          <jointName>rotor_front_left_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>1</direction>
+        </rotor>
+        <rotor>
+          <jointName>rotor_front_right_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>-1</direction>
+        </rotor>
+        <rotor>
+          <jointName>rotor_rear_left_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>-1</direction>
+        </rotor>
+        <rotor>
+          <jointName>rotor_rear_right_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>1</direction>
+        </rotor>
+      </rotorConfiguration>
     </plugin>
   </gazebo>
+
+  <xacro:macro name="motor_model" params="joint link number direction">
+    <gazebo>
+      <plugin
+        filename="gz-sim-multicopter-motor-model-system"
+        name="gz::sim::systems::MulticopterMotorModel">
+        <robotNamespace>drone_robot</robotNamespace>
+        <jointName>${joint}</jointName>
+        <linkName>${link}</linkName>
+        <turningDirection>${direction}</turningDirection>
+        <timeConstantUp>0.0125</timeConstantUp>
+        <timeConstantDown>0.025</timeConstantDown>
+        <maxRotVelocity>1500.0</maxRotVelocity>
+        <motorConstant>8.54858e-06</motorConstant>
+        <momentConstant>0.016</momentConstant>
+        <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+        <motorNumber>${number}</motorNumber>
+        <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+        <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <motorType>velocity</motorType>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Order must match rotorConfiguration above. -->
+  <xacro:motor_model joint="rotor_front_left_joint"  link="rotor_front_left"  number="0" direction="ccw"/>
+  <xacro:motor_model joint="rotor_front_right_joint" link="rotor_front_right" number="1" direction="cw"/>
+  <xacro:motor_model joint="rotor_rear_left_joint"   link="rotor_rear_left"   number="2" direction="cw"/>
+  <xacro:motor_model joint="rotor_rear_right_joint"  link="rotor_rear_right"  number="3" direction="ccw"/>
 
 </robot>

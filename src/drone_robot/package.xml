@@ -2,26 +2,26 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>drone_robot</name>
-  <version>0.0.0</version>
+  <version>0.1.0</version>
   <description>End-to-End RL Drone Navigation via ONNX &amp; ROS 2</description>
   <maintainer email="amartya06.singh@gmail.com">amartya</maintainer>
   <license>Apache-2.0</license>
-
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
-
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>ros_gz_sim</exec_depend>
-  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
   <exec_depend>xacro</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
-
+  <!-- Harmonic gz.transport Python bindings; Humble ros_gz_bridge cannot talk to gz-sim8. -->
+  <!-- onnxruntime has no rosdep key on Humble; install it with pip (see README). -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
   <export>
     <build_type>ament_cmake</build_type>
   </export>

@@ -5,7 +5,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
@@ -17,24 +16,24 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
   drone_robot/inference_node.py
+  drone_robot/gz_bridge_node.py
+  scripts/spawn_drone.py
+  scripts/install_factory_world.sh
+  scripts/bench_factory.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch model
+install(DIRECTORY launch model config models worlds
   DESTINATION share/${PROJECT_NAME}
 )
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/models")
-  install(DIRECTORY models
-    DESTINATION share/${PROJECT_NAME}
-  )
-endif()
-
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+  ament_add_pytest_test(test_preprocess test/test_preprocess.py)
 endif()
 
 ament_package()
