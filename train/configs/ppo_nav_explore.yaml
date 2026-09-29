@@ -1,0 +1,18 @@
+n_timesteps: 750000
+n_envs: 8
+seed: 4
+domain_rand: true
+layout: explore
+n_obstacles: 10
+world_size: 20.0
+episode_len_sec: 40.0
+net_arch: [64, 64]
+# Fine-tune weaving policy; tensors stay 18-D / vx wz.
+learning_rate: 0.0001
+n_steps: 512
+batch_size: 256
+gamma: 0.99
+log_dir: runs/phase_explore
+checkpoint_every: 100000
+# Prefer phase2_dr weaving zip; fall back to phase1 if that run is missing.
+init_from: runs/phase2_dr/latest.zip

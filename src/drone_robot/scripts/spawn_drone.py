@@ -14,24 +14,32 @@ def run(cmd, check=True):
     return subprocess.run(cmd, check=check, capture_output=True, text=True)
 
 
-def wait_for_world(world: str, timeout_sec: float = 40.0) -> None:
+def _list_worlds() -> str:
+    proc = subprocess.run(
+        [
+            'gz', 'service', '-s', '/gazebo/worlds',
+            '--reqtype', 'gz.msgs.Empty',
+            '--reptype', 'gz.msgs.StringMsg_V',
+            '--timeout', '2000',
+            '--req', '',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return (proc.stdout or '') + (proc.stderr or '')
+
+
+def wait_for_world(world: str, timeout_sec: float = 90.0) -> None:
     deadline = time.time() + timeout_sec
+    last = ''
     while time.time() < deadline:
-        proc = subprocess.run(
-            [
-                'gz', 'service', '-s', '/gazebo/worlds',
-                '--reqtype', 'gz.msgs.Empty',
-                '--reptype', 'gz.msgs.StringMsg_V',
-                '--timeout', '500',
-                '--req', '',
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode == 0 and world in proc.stdout:
+        last = _list_worlds()
+        if world in last:
             return
         time.sleep(0.5)
-    raise RuntimeError(f'timed out waiting for gz world {world}')
+    raise RuntimeError(
+        f'timed out waiting for gz world {world}. /gazebo/worlds said:\n{last}'
+    )
 
 
 def parse_args():
@@ -64,9 +72,12 @@ def main():
         f'sdf_filename: "{sdf}", name: "drone_robot", '
         f'pose: {{position: {{x: {args.x}, y: {args.y}, z: {args.z}}}}}',
     ])
-    if 'data: true' not in create.stdout:
+    if 'data: true' not in (create.stdout or ''):
         print(create.stdout, create.stderr, file=sys.stderr)
-        raise RuntimeError('gz create did not return data: true')
+        print('worlds:\n' + _list_worlds(), file=sys.stderr)
+        raise RuntimeError(
+            f'gz create did not return data: true for /world/{args.world}/create'
+        )
 
     time.sleep(0.5)
     run([

@@ -8,7 +8,7 @@ import numpy as np
 import onnxruntime as ort
 import rclpy
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -49,6 +49,8 @@ class DroneInferenceNode(Node):
         self.declare_parameter('altitude_gain', ALTITUDE_GAIN)
         self.declare_parameter('altitude_kd', ALTITUDE_KD)
         self.declare_parameter('max_vz', MAX_VZ)
+        self.declare_parameter('use_planner', False)
+        self.declare_parameter('lookahead_timeout_sec', 0.8)
 
         model_path = self.get_parameter('model_path').value
         if not model_path:
@@ -84,6 +86,9 @@ class DroneInferenceNode(Node):
         self._wp_index = 0
         self._infer_times = []
         self._last_cmd = (0.0, 0.0, 0.0)
+        self._lookahead_xy = None
+        self._lookahead_stamp = None
+        self._use_planner = bool(self.get_parameter('use_planner').value)
 
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.scan_callback, qos_profile_sensor_data
@@ -92,6 +97,10 @@ class DroneInferenceNode(Node):
             Odometry, '/odom', self.odom_callback, qos_profile_sensor_data
         )
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        if self._use_planner:
+            self.create_subscription(
+                PoseStamped, '/lookahead_goal', self._on_lookahead, 10
+            )
 
         rate_hz = float(self.get_parameter('control_rate_hz').value)
         self.timer = self.create_timer(1.0 / rate_hz, self.control_loop)
@@ -110,6 +119,10 @@ class DroneInferenceNode(Node):
         q = msg.pose.pose.orientation
         self.drone_yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w)
         self.last_odom_time = self.get_clock().now()
+
+    def _on_lookahead(self, msg: PoseStamped):
+        self._lookahead_xy = (msg.pose.position.x, msg.pose.position.y)
+        self._lookahead_stamp = self.get_clock().now()
 
     def _altitude_cmd(self) -> float:
         return hover_vz(
@@ -163,15 +176,23 @@ class DroneInferenceNode(Node):
             self.cmd_pub.publish(Twist())
             return
 
-        target_x, target_y, wp_count = self._active_goal()
+        pole_x, pole_y, wp_count = self._active_goal()
+        obs_x, obs_y = pole_x, pole_y
+        if self._use_planner and self._lookahead_xy is not None:
+            timeout = float(self.get_parameter('lookahead_timeout_sec').value)
+            if not self._stale(self._lookahead_stamp, timeout):
+                obs_x, obs_y = self._lookahead_xy
         range_max = float(self.get_parameter('range_max').value)
         tolerance = float(self.get_parameter('goal_tolerance').value)
 
         body_dx, body_dy = compute_relative_target_in_body_frame(
-            self.drone_x, self.drone_y, self.drone_yaw, target_x, target_y
+            self.drone_x, self.drone_y, self.drone_yaw, obs_x, obs_y
+        )
+        pole_dx, pole_dy = compute_relative_target_in_body_frame(
+            self.drone_x, self.drone_y, self.drone_yaw, pole_x, pole_y
         )
 
-        if np.hypot(body_dx, body_dy) < tolerance:
+        if np.hypot(pole_dx, pole_dy) < tolerance:
             hold = Twist()
             hold.linear.z = self._altitude_cmd()
             self.cmd_pub.publish(hold)
@@ -179,7 +200,7 @@ class DroneInferenceNode(Node):
                 self.goal_reached = True
                 self.get_logger().info(
                     f'Waypoint {self._wp_index + 1}/{max(wp_count, 1)} '
-                    f'({target_x:.1f}, {target_y:.1f}) reached at '
+                    f'({pole_x:.1f}, {pole_y:.1f}) reached at '
                     f'({self.drone_x:.2f}, {self.drone_y:.2f}, {self.drone_z:.2f}).'
                 )
                 self._advance_waypoint(wp_count)

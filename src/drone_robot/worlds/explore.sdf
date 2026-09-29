@@ -1,0 +1,228 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="explore">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+      <real_time_update_rate>0</real_time_update_rate>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>-12 -9 7 0 0.5 0.7</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
+    <gravity>0 0 -9.8</gravity>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+          <material>
+            <ambient>0.75 0.75 0.72 1</ambient>
+            <diffuse>0.75 0.75 0.72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 10 2 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>20.5 0.25 4</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>20.5 0.25 4</size></box></geometry>
+          <material><ambient>0.55 0.55 0.58 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -10 2 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>20.5 0.25 4</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>20.5 0.25 4</size></box></geometry>
+          <material><ambient>0.55 0.55 0.58 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_east">
+      <static>true</static>
+      <pose>10 0 2 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.25 20.5 4</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.25 20.5 4</size></box></geometry>
+          <material><ambient>0.55 0.55 0.58 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-10 0 2 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.25 20.5 4</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.25 20.5 4</size></box></geometry>
+          <material><ambient>0.55 0.55 0.58 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="box_a">
+      <static>true</static>
+      <pose>0 2.5 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.2 0.8 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.2 0.8 2</size></box></geometry>
+          <material><ambient>0.45 0.4 0.35 1</ambient><diffuse>0.45 0.4 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="box_b">
+      <static>true</static>
+      <pose>2.5 -3 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.0 1.4 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.0 1.4 2</size></box></geometry>
+          <material><ambient>0.4 0.42 0.45 1</ambient><diffuse>0.4 0.42 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="box_c">
+      <static>true</static>
+      <pose>-2 -1.5 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.9 0.9 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.9 0.9 2</size></box></geometry>
+          <material><ambient>0.42 0.38 0.4 1</ambient><diffuse>0.42 0.38 0.4 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="cyl_a">
+      <static>true</static>
+      <pose>4.5 1.2 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><cylinder><radius>0.35</radius><length>2</length></cylinder></geometry></collision>
+        <visual name="v">
+          <geometry><cylinder><radius>0.35</radius><length>2</length></cylinder></geometry>
+          <material><ambient>0.4 0.4 0.45 1</ambient><diffuse>0.4 0.4 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="cyl_b">
+      <static>true</static>
+      <pose>-4 3.5 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><cylinder><radius>0.3</radius><length>2</length></cylinder></geometry></collision>
+        <visual name="v">
+          <geometry><cylinder><radius>0.3</radius><length>2</length></cylinder></geometry>
+          <material><ambient>0.4 0.4 0.45 1</ambient><diffuse>0.4 0.4 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="cyl_c">
+      <static>true</static>
+      <pose>1 -5 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><cylinder><radius>0.4</radius><length>2</length></cylinder></geometry></collision>
+        <visual name="v">
+          <geometry><cylinder><radius>0.4</radius><length>2</length></cylinder></geometry>
+          <material><ambient>0.4 0.4 0.45 1</ambient><diffuse>0.4 0.4 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="box_d">
+      <static>true</static>
+      <pose>6 -2 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.8 1.2 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.8 1.2 2</size></box></geometry>
+          <material><ambient>0.45 0.4 0.35 1</ambient><diffuse>0.45 0.4 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="box_e">
+      <static>true</static>
+      <pose>-5.5 -4 1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.1 0.7 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.1 0.7 2</size></box></geometry>
+          <material><ambient>0.4 0.42 0.45 1</ambient><diffuse>0.4 0.42 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="goal_west">
+      <static>true</static>
+      <pose>-8 0 0 0 0 0</pose>
+      <link name="link">
+        <visual name="mast">
+          <pose>0 0 1.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>3.0</length></cylinder></geometry>
+          <material>
+            <ambient>0.15 0.85 0.25 1</ambient>
+            <diffuse>0.15 0.85 0.25 1</diffuse>
+            <emissive>0.06 0.34 0.1 1</emissive>
+          </material>
+        </visual>
+        <visual name="ball">
+          <pose>0 0 3.15 0 0 0</pose>
+          <geometry><sphere><radius>0.28</radius></sphere></geometry>
+          <material>
+            <ambient>0.15 0.85 0.25 1</ambient>
+            <diffuse>0.15 0.85 0.25 1</diffuse>
+            <emissive>0.075 0.425 0.125 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="goal_east">
+      <static>true</static>
+      <pose>8 0 0 0 0 0</pose>
+      <link name="link">
+        <visual name="mast">
+          <pose>0 0 1.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>3.0</length></cylinder></geometry>
+          <material>
+            <ambient>0.15 0.35 0.95 1</ambient>
+            <diffuse>0.15 0.35 0.95 1</diffuse>
+            <emissive>0.06 0.14 0.38 1</emissive>
+          </material>
+        </visual>
+        <visual name="ball">
+          <pose>0 0 3.15 0 0 0</pose>
+          <geometry><sphere><radius>0.28</radius></sphere></geometry>
+          <material>
+            <ambient>0.15 0.35 0.95 1</ambient>
+            <diffuse>0.15 0.35 0.95 1</diffuse>
+            <emissive>0.075 0.175 0.475 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

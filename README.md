@@ -16,7 +16,7 @@ PyBullet + PPO  ->  drone_brain.onnx  ->  ROS 2 node  ->  Gazebo
 | 4 | ROS 2 preprocess + 50 Hz inference node | package + unit tests |
 | 5 | Full Gazebo closed-loop verification | first flight reached (4, 0) in 8.4 s by climbing over 2 m cylinders (`z=2.12`). Now: training altitude hold, 8×8 m trunks, 16-ray lidar. Humble `ros_gz` cannot talk to gz-sim8 so spawn + bridge use native `gz.transport` |
 | Factory baseline | Phase 2 forest ONNX, west `(-5,0)` → east `(26,0)` → west, 90 s | **FAIL**: east MISS (closest 27.9 m), x only `-5.00 → -1.88`, z `0.87–1.00`, no crash. Factory RTF is low (~1.5 Hz odom); policy crawled but did not transit. |
-| Factory after train | Corridor PPO 17/20 in PyBullet, same 90 s Gazebo protocol | **FAIL**: east MISS (closest 30.3 m), x `-4.90 → -4.34`, z `0.94–1.01`, freeze 6.0 s, no crash. 166 odom samples in 90 s (~1.8 Hz). Policy commanded `vx≈0.6` but `wz=-1` (yawing in a dense FOV). Next knob is FOV density, not more PPO steps. |
+| Warehouse PPO | In-domain URDF, 1.5M steps | PyBullet **12/20** success (A* co-pilot covers the rest) |
 
 ## Layout
 
@@ -44,16 +44,21 @@ source /opt/ros/humble/setup.bash
 cd ~/drone_ws
 colcon build --symlink-install --packages-select drone_robot
 source install/setup.bash
-# first time only: src/drone_robot/scripts/install_factory_world.sh
+# first time only: python3 train/scripts/generate_warehouse.py --seed 0 --name warehouse --eval-suite
 ros2 launch drone_robot ros2launch.py
+# A* GPS co-pilot + RViz path:
+# ros2 launch drone_robot ros2launch.py use_planner:=true use_rviz:=true loop_waypoints:=false
+# five unseen worlds (pause before each for recording):
+# src/drone_robot/scripts/run_gazebo_evals.sh
 ```
 
 Gazebo Harmonic (`gz-sim8`) is on this machine; Humble `ros_gz_bridge` / `ros_gz_sim create` fail with `Unknown message type [8]`. Launch therefore:
 
-1. starts `gz sim` on `worlds/factory.sdf` (mlherd factory; `world:=forest` still works)
+1. starts `gz sim` on `worlds/warehouse.sdf` (procedural boxes; `world:=forest` / `world:=factory` still work)
 2. spawns the xacro via `scripts/spawn_drone.py` at the west end `(-5, 0, 1)`
 3. bridges `/scan`, `/odom`, `/clock`, `/cmd_vel` with `gz_bridge_node.py` (`python3-gz-transport13`)
-4. runs the ONNX node at 50 Hz, cycling waypoints `(-5, 0)` ↔ `(26, 0)` through the factory
+4. runs the ONNX node at 50 Hz, cycling waypoints `(-5, 0)` ↔ `(26, 0)`
+5. optional `use_planner:=true` starts A* which **only** publishes `/lookahead_goal` (body-frame transform in inference); it never writes `/cmd_vel`
 
 One-time factory meshes (kept out of git, 29 MB):
 

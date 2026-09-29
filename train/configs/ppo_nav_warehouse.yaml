@@ -1,0 +1,15 @@
+n_timesteps: 1500000
+n_envs: 8
+seed: 3
+domain_rand: true
+layout: warehouse
+n_obstacles: 0
+world_size: 38.0
+episode_len_sec: 40.0
+net_arch: [64, 64]
+learning_rate: 0.0003
+n_steps: 512
+batch_size: 256
+gamma: 0.99
+log_dir: runs/phase_warehouse
+checkpoint_every: 100000

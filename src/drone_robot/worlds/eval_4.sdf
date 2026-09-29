@@ -1,0 +1,94 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="eval_4">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+      <real_time_update_rate>0</real_time_update_rate>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <gravity>0 0 -9.8</gravity>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>80 40</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>80 40</size></plane></geometry>
+          <material>
+            <ambient>0.75 0.75 0.72 1</ambient>
+            <diffuse>0.75 0.75 0.72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <include>
+      <uri>file:///home/amartya/drone_ws/src/drone_robot/models/eval_4.urdf</uri>
+      <name>warehouse_layout</name>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+    <model name="goal_west">
+      <static>true</static>
+      <pose>-5.000 0.000 0 0 0 0</pose>
+      <link name="link">
+        <visual name="mast">
+          <pose>0 0 1.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>3.0</length></cylinder></geometry>
+          <material>
+            <ambient>0.15 0.85 0.25 1</ambient>
+            <diffuse>0.15 0.85 0.25 1</diffuse>
+            <emissive>0.06 0.34 0.1 1</emissive>
+          </material>
+        </visual>
+        <visual name="ball">
+          <pose>0 0 3.15 0 0 0</pose>
+          <geometry><sphere><radius>0.28</radius></sphere></geometry>
+          <material>
+            <ambient>0.15 0.85 0.25 1</ambient>
+            <diffuse>0.15 0.85 0.25 1</diffuse>
+            <emissive>0.075 0.425 0.125 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="goal_east">
+      <static>true</static>
+      <pose>26.000 0.000 0 0 0 0</pose>
+      <link name="link">
+        <visual name="mast">
+          <pose>0 0 1.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>3.0</length></cylinder></geometry>
+          <material>
+            <ambient>0.15 0.35 0.95 1</ambient>
+            <diffuse>0.15 0.35 0.95 1</diffuse>
+            <emissive>0.06 0.13999999999999999 0.38 1</emissive>
+          </material>
+        </visual>
+        <visual name="ball">
+          <pose>0 0 3.15 0 0 0</pose>
+          <geometry><sphere><radius>0.28</radius></sphere></geometry>
+          <material>
+            <ambient>0.15 0.35 0.95 1</ambient>
+            <diffuse>0.15 0.35 0.95 1</diffuse>
+            <emissive>0.075 0.175 0.475 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

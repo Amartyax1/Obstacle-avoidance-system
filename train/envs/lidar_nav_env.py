@@ -6,11 +6,22 @@ Action (2,): forward speed vx in [-0.5, 1.5] m/s and yaw rate wz in [-1, 1] rad/
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pybullet as p
 from gymnasium import spaces
 from gym_pybullet_drones.envs.VelocityAviary import VelocityAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
+
+from .online_occupancy import (
+    GRID_RES,
+    INFLATE_M,
+    astar,
+    carve_rays,
+    lookahead_on_path,
+    make_grid,
+)
 
 N_RAYS = 16
 OBS_DIM = 18
@@ -31,6 +42,10 @@ YAW_LOOKAHEAD_SEC = 0.3
 CLEARANCE_M = 1.0
 CLEARANCE_WEIGHT = 2.0
 
+_REPO = Path(__file__).resolve().parents[2]
+DEFAULT_WAREHOUSE_URDF = _REPO / "src" / "drone_robot" / "models" / "warehouse.urdf"
+DEFAULT_WAREHOUSE_NPZ = _REPO / "src" / "drone_robot" / "config" / "warehouse_grid.npz"
+
 
 class LidarNavEnv(VelocityAviary):
     metadata = {"render_modes": ["human"]}
@@ -44,6 +59,7 @@ class LidarNavEnv(VelocityAviary):
         episode_len_sec: float = 20.0,
         lidar_noise_std: float = 0.05,
         layout: str = "forest",
+        warehouse_urdf: str | None = None,
         seed: int | None = None,
     ):
         self.domain_rand = domain_rand
@@ -51,11 +67,17 @@ class LidarNavEnv(VelocityAviary):
         self.world_size = world_size
         self.episode_len_sec = episode_len_sec
         self.layout = layout
+        self.warehouse_urdf = Path(warehouse_urdf) if warehouse_urdf else DEFAULT_WAREHOUSE_URDF
         self.corridor_half_w = 3.0
         self.lidar_noise_std = lidar_noise_std if domain_rand else 0.0
         self.goal_xy = np.zeros(2, dtype=np.float32)
+        self._lookahead_xy = np.zeros(2, dtype=np.float32)
         self.obstacle_ids: list[int] = []
         self.obstacle_xy: np.ndarray = np.zeros((0, 2))
+        self._box_obstacles: list[tuple[float, float, float, float]] = []
+        self._occ: np.ndarray | None = None
+        self._xs: np.ndarray | None = None
+        self._ys: np.ndarray | None = None
         self._prev_goal_dist = 0.0
         self._wind_step = 0
         self._target_yaw = 0.0
@@ -107,8 +129,14 @@ class LidarNavEnv(VelocityAviary):
         return obs, self._computeInfo()
 
     def _layout_episode(self):
+        if self.layout == "warehouse":
+            self._layout_warehouse()
+            return
         if self.layout == "corridor":
             self._layout_corridor()
+            return
+        if self.layout == "explore":
+            self._layout_explore()
             return
         half = self.world_size * 0.45
         spawn = self._rng.uniform(-half * 0.4, half * 0.4, size=2)
@@ -137,6 +165,71 @@ class LidarNavEnv(VelocityAviary):
                 continue
             cylinders.append(xy)
         self.obstacle_xy = np.asarray(cylinders, dtype=np.float32)
+        self._box_obstacles = []
+
+    def _layout_explore(self):
+        half = 0.5 * float(self.world_size)
+        inset = 2.0
+        inner = max(half - inset, 1.0)
+        go_east = bool(self._rng.random() < 0.5)
+        y_spawn = float(self._rng.uniform(-inner, inner))
+        y_goal = float(self._rng.uniform(-inner, inner))
+        west = np.array([-inner, y_spawn], dtype=np.float64)
+        east = np.array([inner, y_goal], dtype=np.float64)
+        spawn = west if go_east else east
+        goal = east if go_east else west
+        yaw = 0.0 if go_east else float(np.pi)
+        self.INIT_XYZS = np.array([[spawn[0], spawn[1], HOVER_Z]], dtype=np.float64)
+        self.INIT_RPYS = np.array([[0.0, 0.0, yaw]], dtype=np.float64)
+        self.goal_xy = goal.astype(np.float32)
+        self._lookahead_xy = self.goal_xy.copy()
+
+        n = int(self._rng.integers(5, 16))
+        cylinders: list[np.ndarray] = []
+        boxes: list[tuple[float, float, float, float]] = []
+        attempts = 0
+        while (len(cylinders) + len(boxes)) < n and attempts < 768:
+            attempts += 1
+            xy = self._rng.uniform(-inner, inner, size=2)
+            if np.linalg.norm(xy - spawn) < 1.5:
+                continue
+            if np.linalg.norm(xy - goal) < 1.5:
+                continue
+            placed = list(cylinders) + [np.array([b[0], b[1]]) for b in boxes]
+            if any(np.linalg.norm(xy - c) < 1.1 for c in placed):
+                continue
+            if self._rng.random() < 0.5:
+                cylinders.append(xy)
+            else:
+                hx = float(self._rng.uniform(0.25, 0.7))
+                hy = float(self._rng.uniform(0.25, 0.7))
+                boxes.append((float(xy[0]), float(xy[1]), hx, hy))
+        self.obstacle_xy = np.asarray(cylinders, dtype=np.float32)
+        self._box_obstacles = boxes
+        pad = 0.5
+        self._occ, self._xs, self._ys = make_grid(
+            -half - pad, half + pad, -half - pad, half + pad, GRID_RES
+        )
+
+    def _layout_warehouse(self):
+        npz = DEFAULT_WAREHOUSE_NPZ
+        name = self.warehouse_urdf.stem
+        candidate = npz.with_name(f"{name}_grid.npz")
+        if candidate.is_file():
+            npz = candidate
+        data = np.load(npz, allow_pickle=True)
+        spawn = np.asarray(data["spawn"], dtype=np.float64)
+        goal = np.asarray(data["goal"], dtype=np.float64)
+        go_east = bool(self._rng.random() < 0.5)
+        west = spawn + np.array([0.0, float(self._rng.uniform(-0.35, 0.35))])
+        east = goal + np.array([0.0, float(self._rng.uniform(-0.35, 0.35))])
+        start = west if go_east else east
+        end = east if go_east else west
+        yaw = 0.0 if go_east else float(np.pi)
+        self.INIT_XYZS = np.array([[start[0], start[1], HOVER_Z]], dtype=np.float64)
+        self.INIT_RPYS = np.array([[0.0, 0.0, yaw]], dtype=np.float64)
+        self.goal_xy = end.astype(np.float32)
+        self.obstacle_xy = np.zeros((0, 2), dtype=np.float32)
 
     def _layout_corridor(self):
         length = float(self.world_size)
@@ -170,6 +263,28 @@ class LidarNavEnv(VelocityAviary):
 
     def _addObstacles(self):
         self.obstacle_ids = []
+        if self.layout == "warehouse":
+            if not self.warehouse_urdf.is_file():
+                raise FileNotFoundError(
+                    f"warehouse URDF missing: {self.warehouse_urdf}. "
+                    "Run train/scripts/generate_warehouse.py"
+                )
+            uid = p.loadURDF(
+                str(self.warehouse_urdf),
+                [0, 0, 0],
+                useFixedBase=True,
+                physicsClientId=self.CLIENT,
+            )
+            self.obstacle_ids.append(uid)
+            if self.GUI:
+                p.addUserDebugLine(
+                    [self.goal_xy[0], self.goal_xy[1], 0.05],
+                    [self.goal_xy[0], self.goal_xy[1], 1.5],
+                    [0.1, 0.8, 0.2],
+                    lineWidth=3,
+                    physicsClientId=self.CLIENT,
+                )
+            return
         if len(self.obstacle_xy) > 0:
             col = p.createCollisionShape(
                 p.GEOM_CYLINDER,
@@ -193,6 +308,9 @@ class LidarNavEnv(VelocityAviary):
                     physicsClientId=self.CLIENT,
                 )
                 self.obstacle_ids.append(body)
+        if self.layout == "explore":
+            self._addExploreBoxes()
+            self._addExploreWalls()
         if self.layout == "corridor":
             self._addCorridorWalls()
         if self.GUI:
@@ -226,6 +344,75 @@ class LidarNavEnv(VelocityAviary):
                 baseCollisionShapeIndex=col,
                 baseVisualShapeIndex=vis,
                 basePosition=[length * 0.5, y, height * 0.5],
+                physicsClientId=self.CLIENT,
+            )
+            self.obstacle_ids.append(body)
+
+    def _addExploreWalls(self):
+        half = 0.5 * float(self.world_size)
+        thick = 0.25
+        height = 4.0
+        length = 2.0 * half
+        col_ew = p.createCollisionShape(
+            p.GEOM_BOX,
+            halfExtents=[length * 0.5, thick * 0.5, height * 0.5],
+            physicsClientId=self.CLIENT,
+        )
+        vis_ew = p.createVisualShape(
+            p.GEOM_BOX,
+            halfExtents=[length * 0.5, thick * 0.5, height * 0.5],
+            rgbaColor=[0.55, 0.55, 0.58, 1.0],
+            physicsClientId=self.CLIENT,
+        )
+        col_ns = p.createCollisionShape(
+            p.GEOM_BOX,
+            halfExtents=[thick * 0.5, length * 0.5, height * 0.5],
+            physicsClientId=self.CLIENT,
+        )
+        vis_ns = p.createVisualShape(
+            p.GEOM_BOX,
+            halfExtents=[thick * 0.5, length * 0.5, height * 0.5],
+            rgbaColor=[0.55, 0.55, 0.58, 1.0],
+            physicsClientId=self.CLIENT,
+        )
+        for y in (half, -half):
+            body = p.createMultiBody(
+                baseMass=0,
+                baseCollisionShapeIndex=col_ew,
+                baseVisualShapeIndex=vis_ew,
+                basePosition=[0.0, y, height * 0.5],
+                physicsClientId=self.CLIENT,
+            )
+            self.obstacle_ids.append(body)
+        for x in (half, -half):
+            body = p.createMultiBody(
+                baseMass=0,
+                baseCollisionShapeIndex=col_ns,
+                baseVisualShapeIndex=vis_ns,
+                basePosition=[x, 0.0, height * 0.5],
+                physicsClientId=self.CLIENT,
+            )
+            self.obstacle_ids.append(body)
+
+    def _addExploreBoxes(self):
+        height = 2.0
+        for x, y, hx, hy in self._box_obstacles:
+            col = p.createCollisionShape(
+                p.GEOM_BOX,
+                halfExtents=[hx, hy, height * 0.5],
+                physicsClientId=self.CLIENT,
+            )
+            vis = p.createVisualShape(
+                p.GEOM_BOX,
+                halfExtents=[hx, hy, height * 0.5],
+                rgbaColor=[0.45, 0.42, 0.38, 1.0],
+                physicsClientId=self.CLIENT,
+            )
+            body = p.createMultiBody(
+                baseMass=0,
+                baseCollisionShapeIndex=col,
+                baseVisualShapeIndex=vis,
+                basePosition=[x, y, height * 0.5],
                 physicsClientId=self.CLIENT,
             )
             self.obstacle_ids.append(body)
@@ -273,8 +460,7 @@ class LidarNavEnv(VelocityAviary):
         pos = state[0:3]
         yaw = float(state[9])
         origin = pos + np.array([0.0, 0.0, 0.02])
-        angles = np.linspace(-np.pi / 2.0, np.pi / 2.0, N_RAYS)
-        headings = yaw + angles
+        headings = self._lidar_headings(yaw)
         directions = np.stack(
             [np.cos(headings), np.sin(headings), np.zeros(N_RAYS)], axis=1
         )
@@ -294,20 +480,48 @@ class LidarNavEnv(VelocityAviary):
             ).astype(np.float32)
         return np.clip(ranges, 0.0, MAX_RANGE)
 
-    def _body_goal(self, state):
+    def _lidar_headings(self, yaw: float) -> np.ndarray:
+        angles = np.linspace(-np.pi / 2.0, np.pi / 2.0, N_RAYS)
+        return yaw + angles
+
+    def _body_xy(self, state, target_xy):
         yaw = float(state[9])
-        world = self.goal_xy - state[0:2]
+        world = np.asarray(target_xy, dtype=np.float32) - state[0:2]
         c, s = np.cos(yaw), np.sin(yaw)
         dx = c * world[0] + s * world[1]
         dy = -s * world[0] + c * world[1]
         return np.array([dx, dy], dtype=np.float32)
+
+    def _body_goal(self, state):
+        return self._body_xy(state, self.goal_xy)
 
     def _computeObs(self):
         state = self._getDroneStateVector(0)
         ranges = self._cast_lidar(state)
         self._min_range = float(np.min(ranges))
         rays = (2.0 * (ranges / MAX_RANGE) - 1.0).astype(np.float32)
-        goal = np.clip(self._body_goal(state) / MAX_RANGE, -1.0, 1.0)
+        target = self.goal_xy
+        if self.layout == "explore" and self._occ is not None:
+            pose_xy = (float(state[0]), float(state[1]))
+            goal_xy = (float(self.goal_xy[0]), float(self.goal_xy[1]))
+            headings = self._lidar_headings(float(state[9]))
+            carve_rays(
+                self._occ,
+                self._xs,
+                self._ys,
+                pose_xy,
+                ranges,
+                headings,
+                MAX_RANGE,
+                inflate_m=INFLATE_M,
+            )
+            path = astar(self._occ, self._xs, self._ys, pose_xy, goal_xy)
+            look = lookahead_on_path(path, pose_xy, distance=2.0)
+            if look is None:
+                look = goal_xy
+            self._lookahead_xy = np.array(look, dtype=np.float32)
+            target = self._lookahead_xy
+        goal = np.clip(self._body_xy(state, target) / MAX_RANGE, -1.0, 1.0)
         return np.concatenate([rays, goal]).astype(np.float32)
 
     def _goal_distance(self, state=None):
@@ -320,10 +534,17 @@ class LidarNavEnv(VelocityAviary):
             state = self._getDroneStateVector(0)
         if state[2] < 0.15 or state[2] > 2.5:
             return True
-        if self.layout == "corridor":
+        if self.layout == "warehouse":
+            if state[0] < -8.5 or state[0] > 30.5 or abs(state[1]) > 12.5:
+                return True
+        elif self.layout == "corridor":
             if state[0] < -0.5 or state[0] > self.world_size + 0.5:
                 return True
             if abs(state[1]) > self.corridor_half_w - 0.05:
+                return True
+        elif self.layout == "explore":
+            limit = 0.5 * float(self.world_size) - 0.18
+            if abs(state[0]) > limit or abs(state[1]) > limit:
                 return True
         elif abs(state[0]) > self.world_size or abs(state[1]) > self.world_size:
             return True
@@ -359,7 +580,10 @@ class LidarNavEnv(VelocityAviary):
         self._prev_goal_dist = dist
 
         reward = 2.0 * float(progress) - 0.02
-        body = self._body_goal(state)
+        heading_xy = (
+            self._lookahead_xy if self.layout == "explore" else self.goal_xy
+        )
+        body = self._body_xy(state, heading_xy)
         g_norm = float(np.linalg.norm(body)) + 1e-6
         reward += 0.1 * float(body[0] / g_norm)
         if self._min_range < CLEARANCE_M:

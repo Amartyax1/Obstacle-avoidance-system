@@ -57,6 +57,40 @@ def compute_relative_target_in_body_frame(
     return float(body_dx), float(body_dy)
 
 
+def binned_lidar_ranges(
+    ranges,
+    angle_min: float,
+    angle_increment: float,
+    range_min: float = 0.05,
+    range_max: float = MAX_RANGE,
+    num_bins: int = N_RAYS,
+) -> np.ndarray:
+    """Downsample the forward 180 deg fan into `num_bins` ranges in meters."""
+    ranges_arr = np.asarray(ranges, dtype=np.float32)
+    if ranges_arr.size == 0:
+        return np.full(num_bins, range_max, dtype=np.float32)
+
+    angles = angle_min + np.arange(ranges_arr.size, dtype=np.float32) * angle_increment
+
+    valid = np.isfinite(ranges_arr)
+    ranges_arr = np.where(valid, ranges_arr, range_max)
+    ranges_arr = np.clip(ranges_arr, range_min, range_max)
+
+    half_fov = math.pi / 2.0
+    fov_mask = (angles >= -half_fov) & (angles <= half_fov)
+    if not np.any(fov_mask):
+        return np.full(num_bins, range_max, dtype=np.float32)
+    fov_angles = angles[fov_mask]
+    fov_ranges = ranges_arr[fov_mask]
+
+    bin_width = (2.0 * half_fov) / num_bins
+    idx = np.clip(((fov_angles + half_fov) / bin_width).astype(np.int32), 0, num_bins - 1)
+
+    binned = np.full(num_bins, range_max, dtype=np.float32)
+    np.minimum.at(binned, idx, fov_ranges)
+    return binned
+
+
 def process_laser_scan(
     ranges,
     angle_min: float,
@@ -71,30 +105,14 @@ def process_laser_scan(
     NaN/Inf mean "nothing detected" and become max range. Each bin keeps the
     closest return so obstacles are never averaged away.
     """
-    ranges_arr = np.asarray(ranges, dtype=np.float32)
-    if ranges_arr.size == 0:
-        return np.ones(num_bins, dtype=np.float32)
-
-    angles = angle_min + np.arange(ranges_arr.size, dtype=np.float32) * angle_increment
-
-    valid = np.isfinite(ranges_arr)
-    ranges_arr = np.where(valid, ranges_arr, range_max)
-    ranges_arr = np.clip(ranges_arr, range_min, range_max)
-
-    half_fov = math.pi / 2.0
-    fov_mask = (angles >= -half_fov) & (angles <= half_fov)
-    if not np.any(fov_mask):
-        return np.ones(num_bins, dtype=np.float32)
-    fov_angles = angles[fov_mask]
-    fov_ranges = ranges_arr[fov_mask]
-
-    # Bin index per ray; the final edge is inclusive so +90 deg is not dropped.
-    bin_width = (2.0 * half_fov) / num_bins
-    idx = np.clip(((fov_angles + half_fov) / bin_width).astype(np.int32), 0, num_bins - 1)
-
-    binned = np.full(num_bins, range_max, dtype=np.float32)
-    np.minimum.at(binned, idx, fov_ranges)
-
+    binned = binned_lidar_ranges(
+        ranges,
+        angle_min,
+        angle_increment,
+        range_min=range_min,
+        range_max=range_max,
+        num_bins=num_bins,
+    )
     return (2.0 * (binned / range_max) - 1.0).astype(np.float32)
 
 

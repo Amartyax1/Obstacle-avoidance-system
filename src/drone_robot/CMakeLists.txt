@@ -17,9 +17,11 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   drone_robot/inference_node.py
   drone_robot/gz_bridge_node.py
+  drone_robot/planner_node.py
   scripts/spawn_drone.py
   scripts/install_factory_world.sh
   scripts/bench_factory.py
+  scripts/run_gazebo_evals.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -34,6 +36,8 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
   ament_add_pytest_test(test_preprocess test/test_preprocess.py)
+  ament_add_pytest_test(test_astar test/test_astar.py)
+  ament_add_pytest_test(test_carve_occupancy test/test_carve_occupancy.py)
 endif()
 
 ament_package()

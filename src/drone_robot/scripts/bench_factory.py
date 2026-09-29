@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-"""90 s Gazebo factory bench: west (-5,0) -> east (26,0) -> west.
+"""90 s warehouse bench: west -> east -> west.
 
 Assumes `ros2 launch drone_robot ros2launch.py` is already running.
 
     python3 src/drone_robot/scripts/bench_factory.py
+    python3 src/drone_robot/scripts/bench_factory.py --grid .../eval_1_grid.npz --world eval_1
 """
 
 from __future__ import annotations
 
+import argparse
+import csv
 import math
 import sys
 import time
+from pathlib import Path
 
+import numpy as np
 import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import Int32
 
 EAST = (26.0, 0.0)
 WEST = (-5.0, 0.0)
@@ -33,8 +39,10 @@ class FactoryBench(Node):
         super().__init__('factory_bench')
         self.samples: list[tuple[float, float, float, float]] = []
         self.cmds: list[tuple[float, float]] = []
+        self.interventions = 0
         self.create_subscription(Odometry, '/odom', self._on_odom, qos_profile_sensor_data)
         self.create_subscription(Twist, '/cmd_vel', self._on_cmd, 10)
+        self.create_subscription(Int32, '/planner/interventions', self._on_n, 10)
 
     def _on_odom(self, msg: Odometry):
         p = msg.pose.pose.position
@@ -42,6 +50,9 @@ class FactoryBench(Node):
 
     def _on_cmd(self, msg: Twist):
         self.cmds.append((time.time(), msg.linear.x))
+
+    def _on_n(self, msg: Int32):
+        self.interventions = int(msg.data)
 
 
 def _first_reach(samples, goal, t0):
@@ -125,6 +136,7 @@ def print_report(r: dict) -> int:
     print(f"z min={r['zmin']:.2f} max={r['zmax']:.2f}")
     print(f"x range=[{r['xmin']:.2f}, {r['xmax']:.2f}]")
     print(f"freeze {r['freeze']:.1f}s  crash={r['crash']} odom_jumps={r['jumps']}")
+    print(f"astar_interventions={r.get('interventions', 0)}")
     ok = (
         r['east_t'] is not None
         and r['west_t'] is not None
@@ -135,11 +147,31 @@ def print_report(r: dict) -> int:
     return 0 if ok else 1
 
 
+def _load_goals(grid_path: str | None):
+    east, west = EAST, WEST
+    if grid_path:
+        data = np.load(grid_path, allow_pickle=True)
+        g = np.asarray(data['goal'], dtype=float)
+        s = np.asarray(data['spawn'], dtype=float)
+        east = (float(g[0]), float(g[1]))
+        west = (float(s[0]), float(s[1]))
+    return east, west
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--grid', default='')
+    parser.add_argument('--world', default='warehouse')
+    parser.add_argument('--csv', default='')
+    parser.add_argument('--timeout', type=float, default=TIMEOUT_SEC)
+    args = parser.parse_args()
+    global EAST, WEST
+    EAST, WEST = _load_goals(args.grid or None)
+
     rclpy.init()
     node = FactoryBench()
-    deadline = time.time() + TIMEOUT_SEC
-    print(f'waiting up to {TIMEOUT_SEC:.0f}s for /odom ...', flush=True)
+    deadline = time.time() + float(args.timeout)
+    print(f'waiting up to {args.timeout:.0f}s for /odom ...', flush=True)
     east_done_at = None
     west_done = False
     while time.time() < deadline:
@@ -155,12 +187,40 @@ def main():
             print(f"west return in {r['west_t']:.1f}s", flush=True)
             time.sleep(1.0)
             break
+    samples, cmds, n_int = node.samples, node.cmds, node.interventions
     node.destroy_node()
     rclpy.shutdown()
-    if not node.samples:
+    if not samples:
         print('FAIL: no /odom')
         return 1
-    return print_report(summarize(node.samples, node.cmds))
+    r = summarize(samples, cmds)
+    r['interventions'] = n_int
+    if args.csv:
+        path = Path(args.csv)
+        new = not path.is_file()
+        with path.open('a', newline='') as f:
+            w = csv.DictWriter(
+                f,
+                fieldnames=[
+                    'world', 'success', 'crash', 'astar_interventions',
+                    'time_sec', 'east_t', 'west_t', 'zmin', 'zmax',
+                ],
+            )
+            if new:
+                w.writeheader()
+            ok = r['east_t'] is not None and r['west_t'] is not None and not r['crash']
+            w.writerow({
+                'world': args.world,
+                'success': int(ok),
+                'crash': int(r['crash']),
+                'astar_interventions': n_int,
+                'time_sec': f"{r['dur']:.2f}",
+                'east_t': '' if r['east_t'] is None else f"{r['east_t']:.2f}",
+                'west_t': '' if r['west_t'] is None else f"{r['west_t']:.2f}",
+                'zmin': f"{r['zmin']:.2f}",
+                'zmax': f"{r['zmax']:.2f}",
+            })
+    return print_report(r)
 
 
 if __name__ == '__main__':

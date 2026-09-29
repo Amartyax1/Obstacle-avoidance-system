@@ -90,6 +90,18 @@ python export_onnx.py --ckpt runs/phase_factory/latest.zip \
                       --out ../src/drone_robot/models/drone_brain.onnx
 ```
 
+## Warehouse URDF (in-domain)
+
+Same boxes as Gazebo. Generate first, then train:
+
+```bash
+python ../train/scripts/generate_warehouse.py --seed 0 --name warehouse --eval-suite
+python train_ppo.py --config configs/ppo_nav_warehouse.yaml
+python eval_policy.py --ckpt runs/phase_warehouse/latest.zip --episodes 20 --warehouse --domain-rand --reseed
+python export_onnx.py --ckpt runs/phase_warehouse/latest.zip \
+                      --out ../src/drone_robot/models/drone_brain.onnx
+```
+
 ## Notes
 
 - `runs/` and `.venv/` are gitignored; the exported `.onnx` is committed instead.

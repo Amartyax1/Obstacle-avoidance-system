@@ -18,9 +18,19 @@ def parse_args():
     parser.add_argument("--gui", action="store_true")
     parser.add_argument("--domain-rand", action="store_true")
     parser.add_argument(
+        "--warehouse",
+        action="store_true",
+        help="procedural warehouse URDF (same boxes as Gazebo)",
+    )
+    parser.add_argument(
         "--corridor",
         action="store_true",
         help="30 m walled hallway with end goals (factory proxy)",
+    )
+    parser.add_argument(
+        "--explore",
+        action="store_true",
+        help="enclosed arena, live occupancy A* lookahead (Stage 3)",
     )
     parser.add_argument(
         "--reseed",
@@ -33,11 +43,25 @@ def parse_args():
 def main():
     args = parse_args()
     env_kwargs = {"gui": args.gui, "domain_rand": args.domain_rand}
-    if args.corridor:
+    if args.warehouse:
+        env_kwargs.update(
+            layout="warehouse",
+            n_obstacles=0,
+            world_size=38.0,
+            episode_len_sec=40.0,
+        )
+    elif args.corridor:
         env_kwargs.update(
             layout="corridor",
             n_obstacles=12,
             world_size=30.0,
+            episode_len_sec=40.0,
+        )
+    elif args.explore:
+        env_kwargs.update(
+            layout="explore",
+            n_obstacles=10,
+            world_size=20.0,
             episode_len_sec=40.0,
         )
     env = LidarNavEnv(**env_kwargs)
