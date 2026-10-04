@@ -9,7 +9,9 @@ import numpy as np
 from drone_robot.grid_astar import astar, lookahead_on_path, world_to_index
 
 GRID_RES = 0.25
-INFLATE_M = 0.25
+# Crazyflie is ~0.1 m across. 0.25 m inflate closed the ~0.4 m gaps between
+# packed cylinders, so A* reported no path and the policy froze at vx=0.
+INFLATE_M = 0.08
 
 __all__ = [
     "GRID_RES",
@@ -64,6 +66,7 @@ def _inflate_hits(
     ys: np.ndarray,
     hits: list[tuple[int, int]],
     inflate_m: float,
+    skip: tuple[int, int] | None = None,
 ) -> None:
     if not hits or inflate_m <= 0.0:
         return
@@ -79,6 +82,8 @@ def _inflate_hits(
                     continue
                 jx, jy = hx + dx, hy + dy
                 if 0 <= jx < nx and 0 <= jy < ny:
+                    if skip is not None and (jx, jy) == skip:
+                        continue
                     occ[jy, jx] = 1
 
 
@@ -124,4 +129,4 @@ def carve_rays(
             continue
         occ[iy, ix] = 1
         hits.append((ix, iy))
-    _inflate_hits(occ, xs, ys, hits, inflate_m)
+    _inflate_hits(occ, xs, ys, hits, inflate_m, skip=(oix, oiy))

@@ -17,6 +17,7 @@ from launch.actions import (
     OpaqueFunction,
     RegisterEventHandler,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
@@ -58,18 +59,18 @@ def _setup(context, *args, **kwargs):
     }
     if world == 'explore':
         infer_extra.update({
-            'target_x': 8.0,
+            'target_x': 40.0,
             'target_y': 0.0,
-            'waypoint_xs': [8.0],
+            'waypoint_xs': [40.0],
             'waypoint_ys': [0.0],
             'loop_waypoints': False,
         })
         planner_params.update({
-            'xmin': -12.0,
-            'xmax': 12.0,
+            'xmin': -52.0,
+            'xmax': 52.0,
             'ymin': -12.0,
             'ymax': 12.0,
-            'goal_x': 8.0,
+            'goal_x': 40.0,
             'goal_y': 0.0,
         })
     else:
@@ -143,7 +144,7 @@ def _setup(context, *args, **kwargs):
             name='harmonic_gz_bridge',
             output='screen',
         ),
-        spawn,
+        TimerAction(period=3.0, actions=[spawn]),
         rviz,
         RegisterEventHandler(
             OnProcessExit(target_action=spawn, on_exit=after_spawn),
@@ -170,8 +171,8 @@ def generate_launch_description():
             description='Run Gazebo server-only (no GUI).'
         ),
         DeclareLaunchArgument(
-            'spawn_x', default_value='-7.2',
-            description='Spawn X (explore: next to green west pole; warehouse west is -5).'
+            'spawn_x', default_value='-36.0',
+            description='Spawn X (explore west; warehouse west is -5).'
         ),
         DeclareLaunchArgument('spawn_y', default_value='0.0'),
         DeclareLaunchArgument('spawn_z', default_value='1.0'),

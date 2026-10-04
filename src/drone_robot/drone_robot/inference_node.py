@@ -21,6 +21,7 @@ from drone_robot.preprocess import (
     MAX_VZ,
     OBS_DIM,
     assemble_observation,
+    binned_lidar_ranges,
     compute_relative_target_in_body_frame,
     hover_vz,
     process_laser_scan,
@@ -230,6 +231,17 @@ class DroneInferenceNode(Node):
         cmd.linear.x = float(np.clip(action[0], min_vx, max_vx))
         cmd.linear.z = self._altitude_cmd()
         cmd.angular.z = float(np.clip(action[1], -max_wz, max_wz))
+        ranges_m = binned_lidar_ranges(
+            scan.ranges,
+            scan.angle_min,
+            scan.angle_increment,
+            range_max=range_max,
+        )
+        min_r = float(np.min(ranges_m))
+        # Packed cylinders fill the 16-ray fan; this actor then outputs vx=0
+        # even when the body still fits. Creep if a gap is still open ahead.
+        if min_r > 0.35 and cmd.linear.x < 0.15 and body_dx > 0.2:
+            cmd.linear.x = 0.45
         self._last_cmd = (cmd.linear.x, cmd.linear.z, cmd.angular.z)
         self.cmd_pub.publish(cmd)
 
