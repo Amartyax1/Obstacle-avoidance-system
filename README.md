@@ -6,7 +6,7 @@ A PPO policy trained in PyBullet flies a Gazebo quadcopter. The actor is exporte
 
 The shipped policy navigating the obstacle course. It uses the normalized lidar fan and a body-frame target.
 
-https://github.com/user-attachments/assets/77fc9265-f9ee-4947-a3c5-5429bd29102e
+<img width="600" height="338" alt="winner_clip" src="https://github.com/user-attachments/assets/c5f23597-6724-40be-b82a-c1917456ec47" />
 
 ## Training history
 
@@ -14,11 +14,11 @@ These clips are from learning, not the system above.
 
 Early on, climbing over the obstacles scored better than flying around them. The reward was then changed to penalize extra altitude.
 
-https://github.com/user-attachments/assets/409bbe1c-4240-46f6-a09b-615f3da7009a
+<img width="600" height="338" alt="oto" src="https://github.com/user-attachments/assets/8cb9dc71-6833-46b3-8460-870ded4180d2" />
 
 A dynamics mismatch between PyBullet and Gazebo, plus early exploration, produced crashes like this flip into an obstacle.
 
-https://github.com/user-attachments/assets/ca36664e-2089-4b33-8730-c3826997bb49
+<img width="600" height="338" alt="collision" src="https://github.com/user-attachments/assets/f4543b44-64ee-48a8-a2f1-0bf8694e6d81" />
 
 ## Architecture
 
